@@ -252,13 +252,26 @@ function buildFields(beamdata) {
         pts.push([(v[0] * e[0] + v[1] * e[1]) / dt, (v[0] * no[0] + v[1] * no[1] + v[2] * no[2]) / dt]);
         rmax = Math.max(rmax, sepDeg(v, c));
       }
-      const padR = 0.55 * D2R, hull = convexHull(pts).map(i => {
-        const p = pts[i], r = Math.hypot(p[0], p[1]) || 1, x = p[0] * (1 + padR / r), y = p[1] * (1 + padR / r);
-        const w = [c[0] + x * e[0] + y * no[0], c[1] + x * e[1] + y * no[1], c[2] + y * no[2]], wn = Math.hypot(w[0], w[1], w[2]);
-        return [w[0] / wn, w[1] / wn, w[2] / wn];
-      });
-      S[b].push({ band: b, id: nm, full: BANDS[b].prefix + nm, c, ra: cra, dec: cdec, rmax, bv, rd, hull, st: "planned", info: {}, obs: [] });
+      const padR = 0.55 * D2R, toSky = ([x, y]) => { const w = [c[0] + x * e[0] + y * no[0], c[1] + x * e[1] + y * no[1], c[2] + y * no[2]], wn = Math.hypot(w[0], w[1], w[2]); return [w[0] / wn, w[1] / wn, w[2] / wn]; };
+      const h2 = convexHull(pts).map(i => { const p = pts[i], r = Math.hypot(p[0], p[1]) || 1; return [p[0] * (1 + padR / r), p[1] * (1 + padR / r)]; }), hull = h2.map(toSky);
+      S[b].push({ band: b, id: nm, full: BANDS[b].prefix + nm, c, ra: cra, dec: cdec, rmax, bv, rd, hull, st: "planned", info: {}, obs: [], _t: { h2, toSky } });
     });
+    /* Split fields: an A and a B field on exactly the same pointing (Band 1's northern strip, observed as two
+       half-length interleaves). They are linked as a pair; A is drawn as the east half of the footprint, B the west. */
+    const byId = new Map(S[b].map(f => [f.id, f]));
+    for (const f of S[b]) {
+      if (!/A$/.test(f.id)) continue; const g = byId.get(f.id.slice(0, -1) + "B"); if (!g) continue;
+      let mx = 0; for (let k = 0; k < 36; k++) mx = Math.max(mx, sepDeg([f.bv[k * 3], f.bv[k * 3 + 1], f.bv[k * 3 + 2]], [g.bv[k * 3], g.bv[k * 3 + 1], g.bv[k * 3 + 2]]));
+      if (mx > 0.01) continue;                       // offset interleaves (Band 2) are ordinary overlapping fields
+      const stem = f.id.slice(0, -1), half = sgn => { // clip the padded hull to x >= 0 (east) or x <= 0 (west)
+        const P = f._t.h2, out = [];
+        for (let i = 0; i < P.length; i++) { const a = P[i], q = P[(i + 1) % P.length], ia = sgn * a[0] >= 0, iq = sgn * q[0] >= 0; if (ia) out.push(a); if (ia !== iq) { const u = a[0] / (a[0] - q[0]); out.push([0, a[1] + u * (q[1] - a[1])]); } }
+        return out.map(f._t.toSky);
+      };
+      Object.assign(f, { pair: g, half: "A", stem, pairName: BANDS[b].prefix + stem + " A|B", halfHull: half(1) });
+      Object.assign(g, { pair: f, half: "B", stem, pairName: f.pairName, halfHull: half(-1) });
+    }
+    for (const f of S[b]) delete f._t;
   }
   return S;
 }
@@ -328,7 +341,9 @@ function matchTarget(S, M, t, cfg) {
   for (const b of [1, 2]) {
     const cov = coverAt(S, b, v, cfg.thr), best = cov[0] || null;
     const tile = M ? M.tiles[b].get(res.tile) || null : null;
-    res.band[b] = { cov, best, st: best ? best.f.st : "none", covered: !!best && FSTAT[best.f.st].rank >= minRank, edge: !!best && best.sep > 0.65, tile };
+    let pair = null;                                  // best field is half of a split field: report both interleaves
+    if (best && best.f.pair) { const A = best.f.half === "A" ? best.f : best.f.pair, B = A.pair; pair = { A: cov.find(c => c.f === A), B: cov.find(c => c.f === B), name: A.pairName, stem: A.stem, good: [A, B].filter(f => FSTAT[f.st].rank >= Math.max(2, minRank)).map(f => f.half) }; }
+    res.band[b] = { pair, cov, best, st: best ? best.f.st : "none", covered: !!best && FSTAT[best.f.st].rank >= minRank, edge: !!best && best.sep > 0.65, tile };
   }
   return res;
 }

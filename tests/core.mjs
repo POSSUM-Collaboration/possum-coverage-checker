@@ -24,6 +24,10 @@ const G = L.parseTargets("l,b\n280.47,-32.89"); assert.ok(L.sepDeg(L.rd2v(G.targ
 
 // --- survey model + matching against the bundled snapshot
 const S = L.buildFields(BEAMDATA); assert.equal(S[1].length, 1014); assert.equal(S[2].length, 1104);
+// split fields: Band 1 has 161 coincident A/B pairs; Band 2 interleaves are offset, so none
+assert.equal(S[1].filter(f => f.pair).length, 322); assert.equal(S[2].filter(f => f.pair).length, 0);
+for (const f of S[1].filter(x => x.pair)) { assert.equal(f.pair.pair, f); assert.notEqual(f.half, f.pair.half); assert.ok(f.halfHull.length >= 4);
+  const east = f.halfHull.every(v => { let d = L.v2rd(v)[0] - f.ra; d -= 360 * Math.round(d / 360); return f.half === "A" ? d > -0.02 : d < 0.02; }); assert.ok(east, "half hull side " + f.id); }
 const obj = (cols, rows) => rows.map(r => Object.fromEntries(cols.map((k, i) => [k, r[i]])));
 const tl = s => s.split("\n").map(l => { const p = l.split(";"); return { tile_id: p[0], aus_src: p[1] || "", "3d_pipeline": p[2] || "" }; });
 const M = L.applyStatus(S, { f1: obj(SNAPSHOT.fcols, SNAPSHOT.fields[1]), f2: obj(SNAPSHOT.fcols, SNAPSHOT.fields[2]), obs: obj(SNAPSHOT.acols, SNAPSHOT.obs), t1: tl(SNAPSHOT.tiles[1]), t2: tl(SNAPSHOT.tiles[2]) });
@@ -40,6 +44,8 @@ if (SNAPSHOT.date === "2026-11-12") { // regression values, cross-checked with a
   const r = L.matchTarget(S, M, { ra: 294.854292, dec: -63.712667 }, { thr: 1.0, minStatus: "observed" });   // PKS 1934-638
   assert.equal(r.band[1].best.f.full, "EMU_1921-64"); assert.equal(r.band[1].best.f.info.sbid, "71466"); assert.equal(r.band[1].best.beam, 30);
   assert.ok(Math.abs(r.band[1].best.sep - 0.0544) < 2e-3); assert.equal(r.band[2].st, "none"); assert.equal(r.tile, 11731);
+  const s = L.matchTarget(S, M, { ra: 201.761, dec: 6.806 }, { thr: 1.0, minStatus: "observed" }).band[1];                  // split field
+  assert.equal(s.pair.name, "EMU_1336+04 A|B"); assert.equal(s.pair.A.f.info.sbid, "71738"); assert.equal(s.pair.B.f.info.sbid, "72000"); assert.deepEqual(s.pair.good, ["A", "B"]);
   const n = L.matchTarget(S, M, { ra: 202.784535, dec: 30.509156 }, { thr: 1.0, minStatus: "observed" });    // 3C 286: north of the survey
   assert.equal(n.band[1].st, "none"); assert.equal(n.band[2].st, "none");
 }

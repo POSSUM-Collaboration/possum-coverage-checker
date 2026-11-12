@@ -37,6 +37,19 @@ The table has one row per target and a block of columns per band:
 | Other beams ≤ R | The same field's other beams whose centres lie within the maximum offset R, nearest first. `+1 SBID` means further scheduling blocks also have beams within reach (for example the A and B halves of a split field); hover the cell, or open the detail panel, for the full list per SBID. |
 | Tile, Band 1 cubes | HEALPix tile containing the target, and the state of its Band 1 3D-pipeline products. |
 
+### Split fields (A|B)
+
+In a strip of northern declinations in Band 1 (field centres between about −9° and +5°), each pointing is observed as two half-length interleaves, A and B, with identical beam positions. The checker treats the two as one **split field**, named for example `EMU_0857+00 A|B`:
+
+- **Map:** the east half of the field footprint is coloured by interleave A's status and the west half by B's. When zoomed in, every beam is drawn as two half discs in the same way, numbered once.
+- **Table:** two small squares, **A** and **B**, follow the status chip and are coloured by each interleave's status (hover for the wording). The Field column reads `0857+00 A|B` and the SBID column lists both scheduling blocks, with a rejected one struck through.
+- **Detail panel:** A and B each have their own card with dates, SBID and history; the beams are the same in both.
+- **Exports:** the summary CSV adds `interleaves` (`A|B`), `interleave_status` (e.g. `rejected|processed`) and `interleave_sbids`.
+
+![A split field: interleave A rejected (east halves, red), interleave B processed (west halves, green)](images/split.png)
+
+A target counts as covered when either interleave has usable data; the verdict says so when only one does. Band 2 fields also come in A and B interleaves, but those are offset from each other by 0.64°, so they are shown as ordinary overlapping fields.
+
 Use the chips above the table to show only targets covered in Band 1, Band 2, both or neither; click a column header to sort; type in the filter box to search by name, field or SBID.
 
 **Click a row** to open the detail panel: a plain-language verdict, a 5° beam chart centred on the target, and for each band every covering field with its status ladder, every beam within the maximum offset (nearest first), dates, 1D-pipeline state, and observation history. The tile block lists how many of the tile's contributing fields have been observed and where its mosaic and cubes stand. `↑`/`↓` step through targets.

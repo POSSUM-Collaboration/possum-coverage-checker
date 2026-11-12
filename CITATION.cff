@@ -7,7 +7,7 @@ authors:
     given-names: Craig
     affiliation: "Research School of Astronomy and Astrophysics, Australian National University"
   - name: "The POSSUM Collaboration"
-version: 1.1.0
+version: 1.2.0
 date-released: 2026-11-12
 license: BSD-3-Clause
 repository-code: "https://github.com/POSSUM-Collaboration/possum-coverage-checker"

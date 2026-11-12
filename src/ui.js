@@ -24,7 +24,7 @@ const EXAMPLE = `RA DEC Name
 201.761 6.806
 14.086 -27.154`;
 
-const VERSION = "1.1.0", REPO_URL = "https://github.com/POSSUM-Collaboration/possum-coverage-checker";
+const VERSION = "1.2.0", REPO_URL = "https://github.com/POSSUM-Collaboration/possum-coverage-checker";
 const ST = {
   S: null, M: null, src: { kind: "loading" }, targets: [], results: [], sel: -1, filter: "all", q: "", sort: { k: "i", d: 1 },
   cfg: Object.assign({ thr: 1.0, minStatus: "observed" }, store.get("cfg", {})),
@@ -288,25 +288,28 @@ function drawSky(canvas, view, o) {
     const order = ["planned", "rejected", "observed", "validated", "processed"], groups = {};
     for (const f of ST.S[band]) { if (!near(f.c, 6)) continue; (groups[f.st] = groups[f.st] || []).push(f); }
     for (const k of order) {
-      if (!groups[k]) continue; ctx.beginPath(); for (const f of groups[k]) polyPath(ctx, P, f.hull);
+      if (!groups[k]) continue; ctx.beginPath(); for (const f of groups[k]) polyPath(ctx, P, f.halfHull || f.hull);
       const col = FSTAT[k].col; ctx.fillStyle = col + (k === "planned" ? "14" : o.mini ? "26" : "50"); ctx.fill();
       ctx.strokeStyle = col + (k === "planned" ? "55" : "c8"); ctx.lineWidth = k === "planned" ? 0.6 : 0.9; ctx.stroke();
     }
     if (o.beams && P.ppd >= 20) {
+      // a beam of a split field is drawn as a half disc: interleave A on the east side, B on the west
+      const northAngle = f => { const a = P.fwd(f.c), q = P.fwd(rd2v(f.ra, Math.min(89.99, f.dec + 0.3))); return Math.atan2(q[1] - a[1], q[0] - a[0]); };
+      const beamPath = (p, f, th) => { if (!f.pair) { ctx.moveTo(p[0] + r, p[1]); ctx.arc(p[0], p[1], r, 0, TAU); return; } ctx.moveTo(p[0] + r * Math.cos(th), p[1] + r * Math.sin(th)); ctx.arc(p[0], p[1], r, th, th + Math.PI, f.half === "A"); ctx.closePath(); };
       const r = 0.45 * P.ppd; ctx.font = (P.ppd > 70 ? 11 : 9.5) + "px ui-monospace,Menlo,monospace"; ctx.textAlign = "center";
       for (const k of order) for (const f of groups[k] || []) {
         if (!near(f.c, 4)) continue; const col = FSTAT[k].col, isHl = hl.has(f);
         ctx.strokeStyle = col + (isHl ? "ee" : hl.size ? "48" : "70"); ctx.lineWidth = isHl ? 1.3 : 0.8; ctx.beginPath();
-        const pts = [];
-        for (let b = 0; b < 36; b++) { const p = P.fwd([f.bv[b * 3], f.bv[b * 3 + 1], f.bv[b * 3 + 2]]); if (p[2] <= 0) continue; pts.push([p, b]); ctx.moveTo(p[0] + r, p[1]); ctx.arc(p[0], p[1], r, 0, TAU); }
+        const pts = [], th = f.pair ? northAngle(f) : 0;
+        for (let b = 0; b < 36; b++) { const p = P.fwd([f.bv[b * 3], f.bv[b * 3 + 1], f.bv[b * 3 + 2]]); if (p[2] <= 0) continue; pts.push([p, b]); beamPath(p, f, th); }
         ctx.stroke();
         const nb = o.nearBeams && o.nearBeams.get(f);
-        if (nb) { ctx.beginPath(); for (const no of nb) { const p = P.fwd([f.bv[(no - 1) * 3], f.bv[(no - 1) * 3 + 1], f.bv[(no - 1) * 3 + 2]]); if (p[2] > 0) { ctx.moveTo(p[0] + r, p[1]); ctx.arc(p[0], p[1], r, 0, TAU); } } ctx.fillStyle = col + "2b"; ctx.fill(); ctx.strokeStyle = col + "ee"; ctx.lineWidth = 1.3; ctx.stroke(); }
-        if (o.hlBeam && o.hlBeam.f === f) { const p = P.fwd([f.bv[(o.hlBeam.no - 1) * 3], f.bv[(o.hlBeam.no - 1) * 3 + 1], f.bv[(o.hlBeam.no - 1) * 3 + 2]]); ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, TAU); ctx.fillStyle = col + "40"; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.stroke(); }
-        if (P.ppd >= (isHl || o.mini ? 36 : 58)) { ctx.fillStyle = isHl ? "#e8ebf2" : "#7c869b"; for (const [p, b] of pts) ctx.fillText(b + 1, p[0], p[1] + 3.5); }
+        if (nb) { ctx.beginPath(); for (const no of nb) { const p = P.fwd([f.bv[(no - 1) * 3], f.bv[(no - 1) * 3 + 1], f.bv[(no - 1) * 3 + 2]]); if (p[2] > 0) beamPath(p, f, th); } ctx.fillStyle = col + "2b"; ctx.fill(); ctx.strokeStyle = col + "ee"; ctx.lineWidth = 1.3; ctx.stroke(); }
+        if (o.hlBeam && o.hlBeam.f === f) { const p = P.fwd([f.bv[(o.hlBeam.no - 1) * 3], f.bv[(o.hlBeam.no - 1) * 3 + 1], f.bv[(o.hlBeam.no - 1) * 3 + 2]]); ctx.beginPath(); beamPath(p, f, th); ctx.fillStyle = col + "40"; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.stroke(); }
+        if (f.half !== "B" && P.ppd >= (isHl || o.mini ? 36 : 58)) { ctx.fillStyle = isHl ? "#e8ebf2" : "#7c869b"; for (const [p, b] of pts) ctx.fillText(b + 1, p[0], p[1] + 3.5); }
       }
     }
-    if (P.ppd >= 9 && !o.mini) { ctx.font = "10.5px -apple-system,Segoe UI,sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = "#9aa3b5cc"; for (const k of order) for (const f of groups[k] || []) { const tp = rd2v(f.ra, Math.min(89.9, f.dec + f.rmax + 0.75)); const p = P.fwd(P.ppd >= 20 ? tp : f.c); if (p[2] > 0 && p[0] > -40 && p[0] < w + 40 && p[1] > 0 && p[1] < h) { ctx.strokeStyle = "#0b0e14e0"; ctx.lineWidth = 3; ctx.lineJoin = "round"; ctx.strokeText(f.full, p[0], p[1] + 3); ctx.fillText(f.full, p[0], p[1] + 3); } } }
+    if (P.ppd >= 17 && !o.mini) { ctx.font = "10.5px -apple-system,Segoe UI,sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = "#9aa3b5cc"; for (const k of order) for (const f of groups[k] || []) { if (f.half === "B") continue; const tp = rd2v(f.ra, Math.min(89.9, f.dec + f.rmax + 0.75)); const p = P.fwd(P.ppd >= 20 ? tp : f.c); if (p[2] > 0 && p[0] > -40 && p[0] < w + 40 && p[1] > 0 && p[1] < h) { ctx.strokeStyle = "#0b0e14e0"; ctx.lineWidth = 3; ctx.lineJoin = "round"; ctx.strokeText(f.pairName || f.full, p[0], p[1] + 3); ctx.fillText(f.pairName || f.full, p[0], p[1] + 3); } } }
   }
   ctx.restore();
   P.outline(ctx); ctx.strokeStyle = "#2c3446"; ctx.lineWidth = 1; ctx.stroke();
@@ -374,6 +377,7 @@ function renderLegend() {
     const cnt = { none: 0, ingest: 0, running: 0, waiting: 0, failed: 0, done: 0 }; for (const t of ST.M.tiles[b].values()) cnt[t.st]++;
     h = `<div class="t">${BANDS[b].label} tiles · 3D pipeline</div>` + ["done", "waiting", "running", "failed", "ingest", "none"].map(k => `<div class="li"><span class="sw" style="background:${TSTAT[k].col}${k === "none" ? "40" : ""}"></span>${TSTAT[k].label}<b>${cnt[k]}</b></div>`).join("");
   } else h = `<div class="t">${BANDS[b].label} fields · ${BANDS[b].freq}</div>` + ["processed", "validated", "observed", "rejected", "planned"].map(k => `<div class="li"><span class="sw" style="background:${FSTAT[k].col}${k === "planned" ? "55" : ""}"></span>${FSTAT[k].label}<b>${x[k]}</b></div>`).join("");
+  if (ST.map.mode !== "tiles" && ST.S[b].some(f => f.pair)) h += `<div class="li" style="margin-top:4px;padding-top:4px;border-top:1px solid var(--edge)"><span class="ab" style="margin:0"><i style="background:#9aa3b5">A</i><i style="background:#566076">B</i></span>split field: east half A, west half B</div>`;
   $("legend").innerHTML = h;
 }
 function homeView() { ST.view.proj = ST.map.proj; syncControls(); Object.assign(ST.view, { lon0: ST.view.proj === "globe" ? 60 : 0, lat0: ST.view.proj === "globe" ? -45 : 0, zoom: 1, panX: 0, panY: 0 }); draw(); }
@@ -400,6 +404,7 @@ function zoomBy(f, mx, my) {
   draw();
 }
 function fieldTip(f) {
+  if (f.pair && !fieldTip._one) { fieldTip._one = true; const A = f.half === "A" ? f : f.pair, s = fieldTip(A) + "<br>" + fieldTip(A.pair) + `<br><span style="color:var(--muted)">split field · A = east half, B = west half</span>`; fieldTip._one = false; return s; }
   const i = f.info; return `<b>${esc(f.full)}</b> · <span class="v">${FSTAT[f.st].label}</span><br>` +
     (i.sbid ? `SBID <span class="v">${i.sbid}</span> · observed ${day(i.obs_start)}` + (i.validated ? `<br>validated: ${esc(i.validated)}` : "") + (i.aus_src ? `<br>POSSUM ingest: ${esc(i.aus_src)}` : "") : "not yet observed");
 }
@@ -424,7 +429,7 @@ function initMap() {
       const q = hitTarget(x, y); let html = "", obj = "";
       if (q) { const t = ST.targets[q.i], r = ST.results[q.i]; html = `<b>${esc(t.name)}</b><br>` + [1, 2].map(bd => `${BANDS[bd].label}: <span class="v">${FSTAT[r.band[bd].st].label}</span>` + (r.band[bd].best ? ` · ${esc(r.band[bd].best.f.full)}` + (r.band[bd].best.f.info.sbid ? ` · SBID ${r.band[bd].best.f.info.sbid}` : "") + ` · beam ${r.band[bd].best.beam}` : "")).join("<br>"); obj = esc(t.name); }
       else if (ST.map.mode === "tiles" && ST.M) { const id = tileOf(ra, dec), t = ST.M.tiles[ST.map.band].get(id); if (t) { html = `<b>Tile ${id}</b> · <span class="v">${TSTAT[t.st].label}</span>` + (isDate(t.p3) ? `<br>3D pipeline finished ${esc(t.p3)}` : "") + (t.aus ? `<br>mosaicked ${esc(t.aus)}` : "") + `<br>${t.fields.filter(f => FSTAT[f.st].rank >= 2).length}/${t.fields.length} contributing fields observed`; obj = "tile " + id; } }
-      else { const cv = coverAt(ST.S, ST.map.band, v, 0.65)[0]; if (cv) { html = fieldTip(cv.f) + `<br>nearest beam ${cv.beam} (${cv.sep.toFixed(2)}°)`; obj = `${cv.f.full} · beam ${cv.beam}`; } }
+      else { const cv = coverAt(ST.S, ST.map.band, v, 0.65)[0]; if (cv) { html = fieldTip(cv.f) + `<br>nearest beam ${cv.beam} (${cv.sep.toFixed(2)}°)`; obj = `${cv.f.pairName || cv.f.full} · beam ${cv.beam}`; } }
       $("st-obj").innerHTML = obj ? `<b>${obj}</b>` : "&nbsp;"; c.style.cursor = q ? "pointer" : "";
       if (html) { tip.innerHTML = html; tip.style.display = "block"; const tw = tip.offsetWidth, th = tip.offsetHeight; tip.style.left = Math.min(c.clientWidth - tw - 8, x + 14) + "px"; tip.style.top = (y + 16 + th > c.clientHeight ? y - th - 10 : y + 16) + "px"; } else tip.style.display = "none";
     });
@@ -491,8 +496,11 @@ function visibleRows() {
 }
 /* "Other beams" cell: the best field's remaining beams within reach, nearest first, plus a count of further SBIDs */
 function beamsByField(x) { return x.cov.map(c => `${c.f.info.sbid ? "SBID " + c.f.info.sbid : "planned"} · ${c.f.full}: ` + c.beams.map(m => `${m.no} (${m.sep.toFixed(2)}°)`).join(", ")).join("\n"); }
+/* split-field helpers: two status squares "A B", and "sbidA | sbidB" with unusable ones dimmed */
+function abBadge(pr) { return `<span class="ab" title="${esc(pr.name)} is a split field (two half-length interleaves on one pointing)\nA: ${FSTAT[pr.A.f.st].label}\nB: ${FSTAT[pr.B.f.st].label}">` + ["A", "B"].map(k => `<i style="background:${FSTAT[pr[k].f.st].col}${pr[k].f.st === "planned" ? "88" : ""}">${k}</i>`).join("") + `</span>`; }
+function pairSbids(pr) { return ["A", "B"].map(k => { const f = pr[k].f; return f.info.sbid ? (FSTAT[f.st].rank >= 2 ? f.info.sbid : `<span style="color:var(--muted);text-decoration:line-through" title="${FSTAT[f.st].label}">${f.info.sbid}</span>`) : "—"; }).join(`<span style="color:var(--muted)"> | </span>`); }
 function otherBeamsCell(x) {
-  const o = x.best.beams.slice(1), more = x.cov.slice(1).filter(c => c.f.info.sbid && FSTAT[c.f.st].rank >= 2).length;
+  const o = x.best.beams.slice(1), more = x.cov.slice(1).filter(c => c.f !== x.best.f.pair && c.f.info.sbid && FSTAT[c.f.st].rank >= 2).length;
   return `<td class="mono" title="${esc("Beams within " + ST.cfg.thr + "° of the target, nearest first\n" + beamsByField(x))}">${o.length ? o.slice(0, 6).map(m => m.no).join(" · ") + (o.length > 6 ? " …" : "") : `<span style="color:var(--muted)">none</span>`}${more ? ` <span style="color:var(--muted)">+${more} SBID${more > 1 ? "s" : ""}</span>` : ""}</td>`;
 }
 function renderResults() {
@@ -514,7 +522,7 @@ function renderResults() {
     h += `<tr data-i="${i}" tabindex="0" class="${i === ST.sel ? "sel" : ""}"><td class="num">${i + 1}</td><td class="nm" title="${esc(t.name)}">${esc(t.name)}${t.resolved ? `<span class="src" title="Position resolved by CDS Sesame">resolved</span>` : ""}${r.changed ? `<span class="newb" title="${esc(r.changed)}">NEW</span>` : ""}</td><td class="mono">${fmtRA(t.ra)}</td><td class="mono">${fmtDec(t.dec)}</td>`;
     for (const b of [1, 2]) {
       const x = r.band[b], c = x.best;
-      h += `<td class="b${b}" title="${c ? esc(FSTAT_DESC[x.st]) : "No POSSUM field of this band reaches this position"}">${chip(x.st, x.edge)}</td>` + (c ? `<td class="mono">${esc(c.f.id)}${x.cov.length > 1 ? ` <span style="color:var(--muted)">+${x.cov.length - 1}</span>` : ""}</td><td class="mono">${c.f.info.sbid || "—"}</td><td class="num">${c.beam}</td><td class="num">${c.sep.toFixed(2)}°</td>${otherBeamsCell(x)}` : `<td class="mono">—</td><td class="mono">—</td><td class="num">—</td><td class="num">—</td><td class="mono">—</td>`);
+      h += `<td class="b${b}" title="${c ? esc(FSTAT_DESC[x.st]) : "No POSSUM field of this band reaches this position"}">${chip(x.st, x.edge)}${x.pair ? abBadge(x.pair) : ""}</td>` + (c ? `<td class="mono">${x.pair ? esc(x.pair.stem) + " A|B" : esc(c.f.id)}${x.cov.length - (x.pair ? 2 : 1) > 0 ? ` <span style="color:var(--muted)">+${x.cov.length - (x.pair ? 2 : 1)}</span>` : ""}</td><td class="mono">${x.pair ? pairSbids(x.pair) : c.f.info.sbid || "—"}</td><td class="num">${c.beam}</td><td class="num">${c.sep.toFixed(2)}°</td>${otherBeamsCell(x)}` : `<td class="mono">—</td><td class="mono">—</td><td class="num">—</td><td class="num">—</td><td class="mono">—</td>`);
     }
     h += `<td class="num tl">${r.tile}</td><td>${r.band[1].tile ? tchip(r.band[1].tile.st) : `<span style="color:var(--muted)">—</span>`}</td></tr>`;
   }
@@ -545,7 +553,7 @@ function renderDetail() {
   if (!t || !r) { el.classList.remove("open"); el.innerHTML = ""; draw(); return; }
   const [l, b] = eq2gal(t.ra, t.dec), verdict = [1, 2].map(bd => {
     const x = r.band[bd], c = x.best; if (!c) return `<b>${BANDS[bd].label}:</b> outside the survey footprint.`;
-    const where = `${esc(c.f.full)}${c.f.info.sbid ? `, SBID ${c.f.info.sbid}` : ""}, beam ${c.beam}`;
+    const pr = x.pair, where = pr ? `${esc(pr.name)}, SBIDs ${pr.A.f.info.sbid || "—"} | ${pr.B.f.info.sbid || "—"}, beam ${c.beam}` + (pr.good.length === 1 ? `; only interleave ${pr.good[0]} has usable data so far` : "") : `${esc(c.f.full)}${c.f.info.sbid ? `, SBID ${c.f.info.sbid}` : ""}, beam ${c.beam}`;
     if (x.covered) return `<b style="color:${FSTAT[x.st].col}">${BANDS[bd].label}: covered</b> — ${FSTAT[x.st].label.toLowerCase()} (${where})${x.edge ? "; near the field edge" : ""}.`;
     if (x.st === "planned") return `<b>${BANDS[bd].label}:</b> planned, not yet observed (${esc(c.f.full)}).`;
     if (x.st === "rejected") return `<b style="color:${FSTAT.rejected.col}">${BANDS[bd].label}:</b> observed but rejected at validation; awaiting re-observation (${where}).`;
@@ -559,11 +567,11 @@ function renderDetail() {
     const x = r.band[bd];
     h += `<div class="card"><div class="ch"><span class="n">${BANDS[bd].label}</span>${chip(x.st, x.edge, FSTAT[x.st].label)}<span class="f">${BANDS[bd].freq}</span></div><div class="cb">`;
     if (x.cov.length) { const withData = x.cov.filter(c => c.f.info.sbid && FSTAT[c.f.st].rank >= 2), nb = withData.reduce((n, c) => n + c.beams.length, 0);
-      h += `<div class="hint" style="margin:0 0 6px">` + (withData.length ? `<b>${nb} beam${nb > 1 ? "s" : ""}</b> in <b>${withData.length} SBID${withData.length > 1 ? "s" : ""}</b> lie within ${+ST.cfg.thr.toFixed(2)}° of this position` + (x.cov.length > withData.length ? `, plus ${x.cov.length - withData.length} field${x.cov.length - withData.length > 1 ? "s" : ""} without usable data` : "") + `.` : `No observed field yet; ${x.cov.length} field${x.cov.length > 1 ? "s" : ""} will cover this position.`) + ` Beams are listed nearest first.</div>`; }
+      h += `<div class="hint" style="margin:0 0 6px">` + (withData.length ? `<b>${nb} beam${nb > 1 ? "s" : ""}</b> in <b>${withData.length} SBID${withData.length > 1 ? "s" : ""}</b> lie within ${+ST.cfg.thr.toFixed(2)}° of this position` + (x.cov.length > withData.length ? `, plus ${x.cov.length - withData.length} field${x.cov.length - withData.length > 1 ? "s" : ""} without usable data` : "") + `.` : `No observed field yet; ${x.cov.length} field${x.cov.length > 1 ? "s" : ""} will cover this position.`) + ` Beams are listed nearest first.` + (x.pair ? ` <b>${esc(x.pair.name)}</b> is a split field: interleaves A and B share one pointing and are observed separately, each for half the usual time, so both appear below with the same beams.` : "") + `</div>`; }
     if (!x.cov.length) h += `<div class="none">No ${BANDS[bd].label} field has a beam centre within ${ST.cfg.thr.toFixed(2)}° of this position${Math.abs(t.dec) > 60 && t.dec > 0 ? " (far northern declinations are outside the survey)" : ""}.</div>`;
     x.cov.forEach((c, k) => {
       const f = c.f, inf = f.info;
-      h += `<div class="fld"><div class="fh"><span class="nm">${esc(f.full)}</span>${chip(f.st)}</div>` + stepsHTML(FSTAT[f.st].rank, k === 0 ? x.tile : null) +
+      h += `<div class="fld"><div class="fh"><span class="nm">${esc(f.full)}</span>${chip(f.st)}${f.pair ? `<span class="src" style="margin-left:auto" title="Split field: interleaves A and B share one pointing and are observed separately">interleave ${f.half} of A|B</span>` : ""}</div>` + stepsHTML(FSTAT[f.st].rank, k === 0 ? x.tile : null) +
         `<div class="beams">${c.beams.map((bm, j) => `<span class="beam${j ? "" : " first"}" title="Offset of the target from the centre of beam ${bm.no}">beam <b>${bm.no}</b> · ${bm.sep.toFixed(3)}°</span>`).join("")}</div>` +
         (inf.sbid ? `<div class="kv"><span>SBID</span><b>${inf.sbid}</b></div><div class="kv"><span>Observed</span><b>${day(inf.obs_start) || "—"}</b></div><div class="kv"><span>ASKAPsoft processed</span><b>${esc(inf.processed) || "—"}</b></div><div class="kv"><span>Validated</span><b>${esc(inf.validated) || "pending"}</b></div><div class="kv"><span>POSSUM ingest (AusSRC)</span><b>${esc(inf.aus_src) || "—"}</b></div>` +
           (inf.pipe1d || inf.dave1d ? `<div class="kv"><span>1D pipeline</span><b>${esc([inf.pipe1d, inf.dave1d].filter(Boolean).join(" · "))}</b></div>` : "") : `<div class="none">In the survey plan; no observation yet.</div>`) +
@@ -602,10 +610,10 @@ function provenance() { const s = ST.src; return `# POSSUM Coverage Checker · s
 function needTargets() { if (!ST.targets.length) { toast("Add some targets first"); return false; } return true; }
 function exportSummary() {
   if (!needTargets()) return; const hd = ["name", "ra_deg", "dec_deg", "ra_hms", "dec_dms", "glon_deg", "glat_deg", "tile_id"];
-  for (const b of [1, 2]) hd.push(...["status", "covered", "field", "sbid", "beam", "beam_offset_deg", "edge", "obs_date", "validated", "possum_ingest", "n_fields", "tile_3d_pipeline", "beams_within_radius", "all_sbid_beams"].map(k => `band${b}_${k}`));
+  for (const b of [1, 2]) hd.push(...["status", "covered", "field", "sbid", "beam", "beam_offset_deg", "edge", "obs_date", "validated", "possum_ingest", "n_fields", "tile_3d_pipeline", "beams_within_radius", "all_sbid_beams", "interleaves", "interleave_status", "interleave_sbids"].map(k => `band${b}_${k}`));
   const rows = ST.targets.map((t, i) => {
     const r = ST.results[i], [l, bb] = eq2gal(t.ra, t.dec), o = [t.name, t.ra.toFixed(6), t.dec.toFixed(6), fmtRA(t.ra), fmtDec(t.dec), l.toFixed(5), bb.toFixed(5), r.tile];
-    for (const b of [1, 2]) { const x = r.band[b], c = x.best, f = c && c.f.info; o.push(x.st, x.covered ? 1 : 0, c ? c.f.full : "", c ? f.sbid : "", c ? c.beam : "", c ? c.sep.toFixed(4) : "", c ? (x.edge ? 1 : 0) : "", c ? day(f.obs_start) : "", c ? f.validated : "", c ? f.aus_src : "", x.cov.length, x.tile ? (x.tile.p3 || (x.tile.aus ? "mosaicked " + x.tile.aus : "")) : "", c ? c.beams.map(m => m.no).join(";") : "", x.cov.filter(q => q.f.info.sbid && FSTAT[q.f.st].rank >= 2).map(q => q.f.info.sbid + ":" + q.beams.map(m => m.no).join(";")).join("|")); }
+    for (const b of [1, 2]) { const x = r.band[b], c = x.best, f = c && c.f.info; o.push(x.st, x.covered ? 1 : 0, c ? c.f.full : "", c ? f.sbid : "", c ? c.beam : "", c ? c.sep.toFixed(4) : "", c ? (x.edge ? 1 : 0) : "", c ? day(f.obs_start) : "", c ? f.validated : "", c ? f.aus_src : "", x.cov.length, x.tile ? (x.tile.p3 || (x.tile.aus ? "mosaicked " + x.tile.aus : "")) : "", c ? c.beams.map(m => m.no).join(";") : "", x.cov.filter(q => q.f.info.sbid && FSTAT[q.f.st].rank >= 2).map(q => q.f.info.sbid + ":" + q.beams.map(m => m.no).join(";")).join("|"), x.pair ? "A|B" : "", x.pair ? x.pair.A.f.st + "|" + x.pair.B.f.st : "", x.pair ? x.pair.A.f.info.sbid + "|" + x.pair.B.f.info.sbid : ""); }
     return o.map(csvCell).join(",");
   });
   download(`possum_coverage_${stamp()}.csv`, provenance() + hd.join(",") + "\n" + rows.join("\n") + "\n", "text/csv");
@@ -649,7 +657,7 @@ const ABOUT = `<p class="hint">Each target is compared with the centres of all 3
 function showHelp() {
   openModal("How the coverage checker works", `
 <h4>1 · Give it targets</h4><ul><li>Drop a <code>.txt</code>/<code>.csv</code> file anywhere, paste lines into the Targets box, or type one into the search box above the map.</li><li>Each line: <code>RA Dec [name]</code> or <code>name RA Dec</code>. Sexagesimal RA is hours (<code>13:37:00.9</code>, <code>13h37m00.9s</code>, <code>13 37 00.9</code>); plain numbers are degrees. Commas, tabs or spaces all work.</li><li>A line with just a name (<code>Abell 3627</code>) is resolved by CDS Sesame. A header row with <code>ra, dec, name</code> or <code>l, b</code> selects columns.</li></ul>
-<h4>2 · Read the answer</h4><ul><li>The table gives, for each band, the best field covering the target, its SBID, the nearest beam (1–36) and the offset from that beam's centre. <b>edge</b> marks targets more than 0.65° from any beam centre.</li><li>Click a row for every covering field, all beams within the maximum offset (in every SBID), observation history, tile and cube status, and a 5° beam chart.</li><li><b>NEW</b> marks targets whose status has improved since you last checked the same position in this browser.</li></ul>
+<h4>2 · Read the answer</h4><ul><li>The table gives, for each band, the best field covering the target, its SBID, the nearest beam (1–36) and the offset from that beam's centre. <b>edge</b> marks targets more than 0.65° from any beam centre.</li><li>Click a row for every covering field, all beams within the maximum offset (in every SBID), observation history, tile and cube status, and a 5° beam chart.</li><li><b>Split fields.</b> In Band 1's northern strip each pointing is observed as two half-length interleaves, A and B. They are shown as one field named <code>A|B</code>: on the map the east half of the footprint (and of each beam) is coloured by A's status and the west half by B's; in the table the <span class="ab"><i style="background:#35c48a">A</i><i style="background:#e0564c">B</i></span> squares give each interleave's status and both SBIDs are listed.</li><li><b>NEW</b> marks targets whose status has improved since you last checked the same position in this browser.</li></ul>
 <h4>3 · Explore the map</h4><ul><li>Drag to move, wheel or <kbd>+</kbd>/<kbd>−</kbd> to zoom, double-click to zoom in; beam footprints and numbers appear when zoomed. Click empty sky to query any position.</li><li>Use the <b>All sky / Globe</b> switch above the map to change projection: all-sky for the overview, globe to spin the sky and zoom in. Also switch between observation and tile / cube status, Band 1 and Band 2, equatorial and Galactic.</li><li><kbd>↑</kbd>/<kbd>↓</kbd> step through targets, <kbd>Esc</kbd> closes panels, <kbd>1</kbd>/<kbd>2</kbd> switch band, <kbd>P</kbd> switches projection.</li></ul>
 <h4>Is it live?</h4><p>The pill at the top right is green when the status came from the tracking sheet in this session. If the sheet cannot be reached the page says so and falls back to a snapshot built in on ${SNAPSHOT.date}; exports record which was used.</p>`);
 }
