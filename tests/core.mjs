@@ -32,6 +32,10 @@ for (const b of [1, 2]) { const x = M.stats[b]; assert.equal(x.planned + x.rejec
 // a position on a beam centre must return that beam at ~zero offset
 const f = S[1][10], m = L.coverAt(S, 1, [f.bv[51], f.bv[52], f.bv[53]], 1.0).find(x => x.f === f);
 assert.equal(m.beam, 18); assert.ok(m.sep < 1e-4);
+for (const thr of [0.65, 1.0, 1.6]) for (const c of L.coverAt(S, 1, [f.bv[51], f.bv[52], f.bv[53]], thr)) { // every listed beam is within reach, nearest first
+  assert.equal(c.beams[0].no, c.beam); assert.ok(c.beams.every((b, i) => b.sep <= thr && (i === 0 || b.sep >= c.beams[i - 1].sep)));
+}
+assert.ok(L.coverAt(S, 1, [f.bv[51], f.bv[52], f.bv[53]], 1.0).find(x => x.f === f).beams.length >= 5, "interior beam has neighbours within 1 deg");
 if (SNAPSHOT.date === "2026-11-12") { // regression values, cross-checked with astropy against covered_by_POSSUM.py logic
   const r = L.matchTarget(S, M, { ra: 294.854292, dec: -63.712667 }, { thr: 1.0, minStatus: "observed" });   // PKS 1934-638
   assert.equal(r.band[1].best.f.full, "EMU_1921-64"); assert.equal(r.band[1].best.f.info.sbid, "71466"); assert.equal(r.band[1].best.beam, 30);

@@ -11,7 +11,7 @@ A single-page browser tool for the [Polarisation Sky Survey of the Universe's Ma
 ## What you get
 
 - **Per target, per band:** survey status (planned → observed → validated → POSSUM-processed, or rejected), the covering field, its SBID, the nearest beam (1–36) and the offset from that beam's centre, with an *edge* flag for targets outside the beam grid.
-- **Every covering field**, not only the nearest: overlapping and interleaved (A/B) fields are all listed, each with its three nearest beams, observation and validation dates, and the full observation history including rejected attempts.
+- **Every covering field**, not only the nearest: overlapping and interleaved (A/B) fields are all listed, each with every beam within reach of the target (nearest first), observation and validation dates, and the full observation history including rejected attempts.
 - **Tile products:** the HEALPix tile (N<sub>side</sub> 32) containing the target and the state of its mosaic and 3D-pipeline cubes.
 - **A sky map** of the survey as it stands today — Mollweide or globe, equatorial or Galactic, observations or tile products, Band 1 or Band 2 — with beam footprints when zoomed in. Click any patch of sky to query it.
 - **Live status, visibly.** A green indicator means the status came from the tracking sheet in this session. If the sheet cannot be reached, the page says so and falls back to a dated built-in snapshot; exports record which was used.

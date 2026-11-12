@@ -104,6 +104,9 @@ input[type=range]{width:100%;accent-color:var(--acc)}
 #quick{position:relative;width:310px;max-width:38vw}
 #quick input{padding:6px 10px 6px 28px;border-radius:8px;background:#12161fd9;backdrop-filter:blur(6px)}
 #quick .ic{position:absolute;left:9px;top:6px;color:var(--muted);font-size:12px}
+#seg-proj{flex:0 0 auto;border-radius:8px;backdrop-filter:blur(6px)}
+#seg-proj button{background:#12161fd9;padding:5px 12px;font-size:11.5px;white-space:nowrap}
+#seg-proj button.on{background:#274477;color:#fff}
 #viewinfo{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .pill{background:#12161fd9;border:1px solid var(--edge);border-radius:8px;padding:5px 10px;
   font-size:11px;color:var(--ink2);backdrop-filter:blur(6px);white-space:nowrap;display:flex;align-items:center;gap:6px}
@@ -356,6 +359,7 @@ a:hover{text-decoration:underline}
         <div id="quick"><span class="ic">&#128269;</span>
           <input type="search" id="quickbox" placeholder="Check an object name or position &hellip;" autocomplete="off" aria-label="Quick check">
         </div>
+        <div class="seg" id="seg-proj" role="group" aria-label="Map projection"><button data-v="moll" title="All-sky Mollweide projection (P)">All sky</button><button data-v="globe" title="Globe you can spin and zoom (P)">Globe</button></div>
         <div id="viewinfo">
           <button class="pill" id="pill-live" title="Survey status source"><span class="dot busy"></span><span>Loading status&hellip;</span></button>
           <div class="pill hide-s" id="pill-view">&nbsp;</div>

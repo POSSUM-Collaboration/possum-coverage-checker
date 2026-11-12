@@ -33,17 +33,19 @@ The table has one row per target and a block of columns per band:
 | Status | The best field covering the target: *Planned*, *Observed* (awaiting validation), *Validated*, *Processed* (ingested by the POSSUM pipeline at AusSRC), or *Rejected* (observed, failed validation, to be re-observed). "—" means no field of that band reaches the position. |
 | Field | Field name without the `EMU_` / `WALLABY_` prefix; `+2` means two further fields also cover the target. |
 | SBID | ASKAP scheduling block of that field's current observation. |
-| Beam, Offset | Nearest beam (1–36, as numbered in the beam-centre tables) and the angular distance from its centre. |
+| Nearest beam, Offset | Nearest beam (1–36, as numbered in the beam-centre tables) and the angular distance from its centre. |
+| Other beams ≤ R | The same field's other beams whose centres lie within the maximum offset R, nearest first. `+1 SBID` means further scheduling blocks also have beams within reach (for example the A and B halves of a split field); hover the cell, or open the detail panel, for the full list per SBID. |
 | Tile, Band 1 cubes | HEALPix tile containing the target, and the state of its Band 1 3D-pipeline products. |
 
 Use the chips above the table to show only targets covered in Band 1, Band 2, both or neither; click a column header to sort; type in the filter box to search by name, field or SBID.
 
-**Click a row** to open the detail panel: a plain-language verdict, a 5° beam chart centred on the target, and for each band every covering field with its status ladder, three nearest beams, dates, 1D-pipeline state, and observation history. The tile block lists how many of the tile's contributing fields have been observed and where its mosaic and cubes stand. `↑`/`↓` step through targets.
+**Click a row** to open the detail panel: a plain-language verdict, a 5° beam chart centred on the target, and for each band every covering field with its status ladder, every beam within the maximum offset (nearest first), dates, 1D-pipeline state, and observation history. The tile block lists how many of the tile's contributing fields have been observed and where its mosaic and cubes stand. `↑`/`↓` step through targets.
 
 ## 4. Explore the map
 
 ![Zoomed view with beam footprints](images/zoom.png)
 
+- The **All sky / Globe** switch above the map (or `P`) changes projection: Mollweide for the whole survey at a glance, globe to spin the sky and zoom in.
 - Drag to move, scroll or `+`/`−` to zoom, double-click to zoom in. Close-up views switch to the globe projection so beam footprints are undistorted; the home button returns to the all-sky view.
 - Fields are coloured by status. Beam footprints (circles of half the beam pitch) appear when zoomed in, numbered for the fields covering the selected target.
 - **Show → Tiles & cubes** colours HEALPix tiles by 3D-pipeline state instead.
@@ -73,9 +75,9 @@ Use the chips above the table to show only targets covered in Band 1, Band 2, bo
 
 | Export | Contents |
 |---|---|
-| Summary CSV | One row per target: coordinates, tile, and per band the status, field, SBID, beam, offset, edge flag, dates and tile 3D-pipeline state. |
-| All matches CSV | One row per target × covering field × nearest three beams. |
-| SBID / beam list | The unique scheduling blocks covering your targets at the chosen level, with the beam for each target. |
+| Summary CSV | One row per target: coordinates, tile, and per band the status, field, SBID, nearest beam, offset, edge flag, dates, tile 3D-pipeline state, `beams_within_radius` (best field, `;`-separated, nearest first) and `all_sbid_beams` (`SBID:beams` for every SBID with data, `|`-separated). |
+| All matches CSV | One row per target × covering field × beam within the maximum offset (`beam_rank` 1 = nearest). |
+| SBID / beam list | The unique scheduling blocks covering your targets at the chosen level, with every beam within the maximum offset of each target, nearest first. |
 | Map PNG | The current map view at 2× resolution with title, status source and key. |
 
 Every CSV starts with a `#` comment line recording the status source and time, the maximum offset and the coverage level (read with `pandas.read_csv(..., comment="#")`).

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0 — 2026-11-12
+
+- All beams within the maximum offset are now reported for every covering field (previously the three nearest regardless of distance): new "Other beams" table column, full per-SBID lists in the detail panel, shaded on the beam chart and map, and carried through the CSV and SBID-list exports (`beams_within_radius`, `all_sbid_beams`, `beam_rank`).
+- "All sky / Globe" switch above the map (shortcut `P`); switching to the globe keeps the current view centre.
+
 ## 1.0.0 — 2026-11-12
 
 First public release.

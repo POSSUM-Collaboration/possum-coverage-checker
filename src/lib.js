@@ -304,7 +304,8 @@ function applyStatus(S, tabs) {
 }
 
 /* ---------------- cross-match ---------------- */
-/* For one position: every field (any status) of `band` whose nearest beam centre is within thr deg. */
+/* For one position: every field (any status) of `band` whose nearest beam centre is within thr deg.
+   Each entry lists all of that field's beams within thr (`beams`, nearest first); `beam`/`sep` are the nearest. */
 function coverAt(S, band, v, thr) {
   const out = [], seps = new Float64Array(36);
   for (const f of S[band]) {
@@ -313,7 +314,7 @@ function coverAt(S, band, v, thr) {
     let best = 1e9;
     for (let k = 0; k < 36; k++) { const s = sepDeg(v, [f.bv[k * 3], f.bv[k * 3 + 1], f.bv[k * 3 + 2]]); seps[k] = s; if (s < best) best = s; }
     if (best > thr) continue;
-    const order = Array.from(seps.keys()).sort((a, b) => seps[a] - seps[b]).slice(0, 3);
+    const order = Array.from(seps.keys()).filter(k => seps[k] <= thr).sort((a, b) => seps[a] - seps[b]);   // every beam within reach, nearest first
     out.push({ f, sep: best, beam: order[0] + 1, beams: order.map(k => ({ no: k + 1, sep: seps[k] })) });
   }
   // fields with data first, then those where the target sits inside the beam grid, then furthest along, then closest
