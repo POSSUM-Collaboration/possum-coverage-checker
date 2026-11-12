@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: "If you use this tool, please acknowledge it as below and cite the POSSUM survey description paper."
+title: "POSSUM Coverage Checker"
+type: software
+authors:
+  - family-names: Anderson
+    given-names: Craig
+    affiliation: "Research School of Astronomy and Astrophysics, Australian National University"
+  - name: "The POSSUM Collaboration"
+version: 1.0.0
+date-released: 2026-11-12
+license: BSD-3-Clause
+repository-code: "https://github.com/POSSUM-Collaboration/possum-coverage-checker"
+url: "https://possum-collaboration.github.io/possum-coverage-checker/"
+keywords: [radio astronomy, polarisation, ASKAP, POSSUM, survey coverage]

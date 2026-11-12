@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>POSSUM Coverage Checker</title>
+<style>
+:root{
+  --bg:#0b0e14; --panel:#12161f; --panel2:#181d29; --edge:#242b3a;
+  --ink:#e8ebf2; --ink2:#9aa3b5; --muted:#6b7488;
+  --acc:#4f8cff; --acc2:#7aa5f5; --warn:#e0a33b; --pos:#e0362c; --neg:#3b6fd4; --ok:#35c48a;
+  --radius:10px; --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box; margin:0; padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);font-size:13px}
+#app{display:flex;width:100%;height:100%}
+
+/* ---------------- sidebar (shared look with the DR1 Sky Explorer) ---------------- */
+#sidebar{width:318px;min-width:318px;height:100%;overflow-y:auto;overflow-x:hidden;
+  background:var(--panel);border-right:1px solid var(--edge);display:flex;flex-direction:column;
+  scrollbar-width:thin;scrollbar-color:var(--edge) transparent;z-index:20}
+#sidebar.collapsed{display:none}
+#brand{padding:14px 16px 10px;border-bottom:1px solid var(--edge)}
+#brand h1{font-size:16px;font-weight:650;letter-spacing:.2px}
+#brand h1 span{color:var(--acc2)}
+#brand .sub{color:var(--ink2);font-size:11px;margin-top:3px;line-height:1.45}
+.section{border-bottom:1px solid var(--edge)}
+.sec-head{display:flex;align-items:center;justify-content:space-between;padding:9px 16px;
+  cursor:pointer;user-select:none;font-weight:600;font-size:12px;letter-spacing:.4px;
+  text-transform:uppercase;color:var(--ink2)}
+.sec-head:hover{color:var(--ink)}
+.sec-head .chev{transition:transform .15s;font-size:10px}
+.section.open .sec-head .chev{transform:rotate(90deg)}
+.sec-body{display:none;padding:2px 16px 14px}
+.section.open .sec-body{display:block}
+.row{display:flex;align-items:center;gap:8px;margin:7px 0}
+.row label{color:var(--ink2);flex:0 0 auto}
+.row .grow{flex:1;min-width:0}
+select,input[type=text],input[type=number],input[type=search],textarea{
+  background:var(--panel2);color:var(--ink);border:1px solid var(--edge);
+  border-radius:6px;padding:5px 8px;font-size:12px;width:100%;outline:none;font-family:var(--sans)}
+select:focus,input:focus,textarea:focus{border-color:var(--acc)}
+textarea{font-family:var(--mono);font-size:11px;line-height:1.5;resize:vertical;min-height:112px;white-space:pre;overflow:auto}
+button{background:var(--panel2);color:var(--ink);border:1px solid var(--edge);
+  border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:var(--sans)}
+button:hover{border-color:var(--acc);color:#fff}
+button:focus-visible,.seg button:focus-visible,tr:focus-visible{outline:2px solid var(--acc2);outline-offset:1px}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+button.primary:hover{background:var(--acc2)}
+button.mini{padding:2px 7px;font-size:11px;color:var(--ink2)}
+button.mini:hover{color:#fff}
+button.mini.on{border-color:var(--acc);color:#fff;background:#4f8cff22}
+button:disabled{opacity:.45;cursor:default}
+.btnrow{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 2px}
+.check{display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer;color:var(--ink)}
+.check input{accent-color:var(--acc);width:14px;height:14px;cursor:pointer}
+.hint{color:var(--muted);font-size:11px;line-height:1.5;margin:6px 0}
+.hint b{color:var(--ink2);font-weight:550}
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--ink2);margin:3px 0}
+.kv b{color:var(--ink);font-family:var(--mono);font-weight:500;text-align:right}
+.seg{display:flex;border:1px solid var(--edge);border-radius:6px;overflow:hidden;flex:1}
+.seg button{flex:1;border:0;border-radius:0;background:var(--panel2);color:var(--ink2);padding:5px 6px}
+.seg button+button{border-left:1px solid var(--edge)}
+.seg button.on{background:#4f8cff2b;color:#fff}
+input[type=range]{width:100%;accent-color:var(--acc)}
+
+/* drop zone */
+#drop{border:1.5px dashed #34405a;border-radius:9px;padding:14px 10px;text-align:center;color:var(--ink2);
+  cursor:pointer;line-height:1.5;transition:border-color .15s,background .15s;margin:4px 0 8px}
+#drop:hover{border-color:var(--acc);background:#4f8cff0d}
+#drop b{color:var(--ink);font-weight:600}
+#drop small{display:block;color:var(--muted);font-size:10.5px;margin-top:2px}
+#parsemsg{font-size:11px;line-height:1.5;margin-top:6px;color:var(--ink2)}
+#parsemsg .bad{color:var(--warn)}
+#parsemsg details{margin-top:3px}
+#parsemsg summary{cursor:pointer;color:var(--warn)}
+#parsemsg li{margin-left:16px;font-family:var(--mono);font-size:10.5px;color:var(--ink2)}
+
+/* survey status block */
+.live{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border:1px solid var(--edge);border-radius:8px;background:var(--panel2);font-size:11.5px;line-height:1.45;margin:4px 0 8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:0 0 auto;margin-top:4px}
+.dot.ok{background:var(--ok);box-shadow:0 0 0 3px #35c48a2b}
+.dot.stale{background:var(--warn);box-shadow:0 0 0 3px #e0a33b2b}
+.dot.busy{background:var(--acc);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.live small{color:var(--muted);display:block}
+.prog{margin:9px 0 3px}
+.prog .lab{display:flex;justify-content:space-between;font-size:11px;color:var(--ink2);margin-bottom:4px}
+.prog .lab b{color:var(--ink);font-family:var(--mono);font-weight:500;font-size:10.5px}
+.stack{display:flex;height:7px;border-radius:4px;overflow:hidden;background:var(--edge)}
+.stack i{display:block;height:100%}
+
+/* ---------------- main ---------------- */
+#main{flex:1;min-width:0;height:100%;display:flex;flex-direction:column}
+#stage{position:relative;flex:1;min-height:180px;background:var(--bg);overflow:hidden}
+#sky{position:absolute;inset:0;width:100%;height:100%;cursor:grab}
+#sky.dragging{cursor:grabbing}
+#topbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:8px;
+  padding:10px 14px;pointer-events:none;z-index:10}
+#topbar>*{pointer-events:auto}
+#burger{font-size:15px;padding:4px 10px}
+#quick{position:relative;width:310px;max-width:38vw}
+#quick input{padding:6px 10px 6px 28px;border-radius:8px;background:#12161fd9;backdrop-filter:blur(6px)}
+#quick .ic{position:absolute;left:9px;top:6px;color:var(--muted);font-size:12px}
+#viewinfo{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.pill{background:#12161fd9;border:1px solid var(--edge);border-radius:8px;padding:5px 10px;
+  font-size:11px;color:var(--ink2);backdrop-filter:blur(6px);white-space:nowrap;display:flex;align-items:center;gap:6px}
+.pill b{color:var(--ink);font-family:var(--mono);font-weight:500}
+.pill .dot{margin-top:0}
+button.pill{cursor:pointer}
+#legend{position:absolute;left:14px;bottom:30px;background:#12161fd9;border:1px solid var(--edge);border-radius:8px;
+  padding:8px 10px;font-size:11px;color:var(--ink2);backdrop-filter:blur(6px);z-index:8;line-height:1.75;pointer-events:none}
+#legend .t{color:var(--ink);font-weight:600;margin-bottom:2px}
+#legend .li{display:flex;align-items:center;gap:7px}
+#legend .li b{margin-left:auto;padding-left:14px;color:var(--ink);font-family:var(--mono);font-weight:500;font-size:10.5px}
+.sw{width:10px;height:10px;border-radius:3px;flex:0 0 auto;display:inline-block}
+#mapctl{position:absolute;right:14px;bottom:30px;display:flex;flex-direction:column;gap:4px;z-index:8}
+#mapctl button{width:28px;height:28px;padding:0;background:#12161fd9;font-size:14px}
+#status{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;
+  padding:6px 14px;font-family:var(--mono);font-size:11px;color:var(--ink2);
+  background:linear-gradient(transparent,#0b0e14cc 40%);pointer-events:none;z-index:9;white-space:nowrap;overflow:hidden}
+#status b{color:var(--ink);font-weight:500}
+#progress{position:absolute;left:50%;top:52px;transform:translateX(-50%);
+  background:#12161fee;border:1px solid var(--edge);border-radius:8px;padding:7px 16px;
+  font-size:12px;color:var(--ink);display:none;z-index:30;box-shadow:0 8px 30px #0009;min-width:220px;text-align:center}
+#progress .bar{height:3px;border-radius:2px;background:var(--edge);margin-top:6px;overflow:hidden}
+#progress .bar>div{height:100%;background:var(--acc);width:0%;transition:width .2s}
+#banner{position:absolute;left:50%;top:52px;transform:translateX(-50%);z-index:29;display:none;max-width:min(680px,90%);
+  background:#2a2110f2;border:1px solid #6b5220;color:#f3d79b;border-radius:8px;padding:8px 12px;font-size:12px;line-height:1.5;
+  box-shadow:0 8px 30px #0009;align-items:center;gap:10px}
+#banner button{flex:0 0 auto}
+#tip{position:absolute;background:#12161ff0;border:1px solid var(--edge);border-radius:7px;
+  padding:6px 9px;font-size:11px;pointer-events:none;display:none;z-index:35;max-width:280px;
+  box-shadow:0 6px 20px #0008;line-height:1.55;color:var(--ink2)}
+#tip b{color:var(--acc2)}
+#tip .v{color:var(--ink)}
+#inspect{position:absolute;background:var(--panel);border:1px solid var(--edge);border-radius:10px;
+  min-width:250px;max-width:320px;box-shadow:0 12px 40px #000a;display:none;z-index:40;font-size:12px}
+#inspect .hd{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;
+  border-bottom:1px solid var(--edge);font-weight:600}
+#inspect .hd .x{cursor:pointer;color:var(--muted);padding:0 4px}
+#inspect .hd .x:hover{color:#fff}
+#inspect .bd{padding:8px 12px;max-height:300px;overflow-y:auto}
+#inspect .foot{padding:7px 12px;border-top:1px solid var(--edge);display:flex;gap:6px}
+
+/* ---------------- results ---------------- */
+#split{height:7px;cursor:row-resize;background:var(--panel);border-top:1px solid var(--edge);border-bottom:1px solid var(--edge);position:relative;flex:0 0 auto}
+#split::after{content:"";position:absolute;left:50%;top:2px;width:34px;height:1px;background:var(--muted);box-shadow:0 2px 0 var(--muted);transform:translateX(-50%)}
+#results{height:42%;min-height:92px;background:var(--panel);display:flex;flex-direction:column;flex:0 0 auto}
+#resbar{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--edge);flex-wrap:wrap}
+#resbar .ttl{font-weight:600;font-size:12px;letter-spacing:.4px;text-transform:uppercase;color:var(--ink2);margin-right:4px}
+.chipf{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--edge);background:var(--panel2);color:var(--ink2);
+  border-radius:999px;padding:3px 10px;font-size:11.5px;cursor:pointer;white-space:nowrap}
+.chipf:hover{border-color:var(--acc);color:#fff}
+.chipf.on{border-color:var(--acc);background:#4f8cff2b;color:#fff}
+.chipf b{font-family:var(--mono);font-weight:500;color:var(--ink)}
+#resfilter{width:170px;margin-left:auto}
+#tablewrap{flex:1;overflow:auto;scrollbar-width:thin;scrollbar-color:var(--edge) transparent}
+table.res{width:100%;border-collapse:collapse;font-size:12px}
+table.res thead{position:sticky;top:0;z-index:2}
+table.res th{background:var(--panel);text-align:left;font-weight:600;color:var(--ink2);
+  font-size:11px;padding:6px 9px;border-bottom:1px solid var(--edge);white-space:nowrap;cursor:pointer;user-select:none}
+table.res th:hover{color:var(--ink)}
+table.res th.grp{cursor:default;text-transform:uppercase;letter-spacing:.4px;font-size:10px;padding-bottom:2px;border-bottom:0}
+table.res th.b1,table.res td.b1{border-left:1px solid var(--edge)}
+table.res th.b2,table.res td.b2{border-left:1px solid var(--edge)}
+table.res th.tl,table.res td.tl{border-left:1px solid var(--edge)}
+table.res td{padding:5px 9px;border-bottom:1px solid #1b2130;white-space:nowrap;color:var(--ink2)}
+table.res td.nm{color:var(--ink);font-weight:550;max-width:210px;overflow:hidden;text-overflow:ellipsis}
+table.res td.mono{font-family:var(--mono);font-size:11px}
+table.res td.num{font-family:var(--mono);font-size:11px;text-align:right}
+table.res tbody tr{cursor:pointer}
+table.res tbody tr:hover td{background:#181d29}
+table.res tbody tr.sel td{background:#4f8cff1f}
+table.res tbody tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--acc)}
+.chip{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:1px 8px 1px 6px;font-size:11px;font-weight:550;
+  border:1px solid transparent;white-space:nowrap;line-height:1.6}
+.chip i{width:7px;height:7px;border-radius:50%;display:inline-block}
+.chip.edge::after{content:"edge";font-size:9px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;opacity:.8;margin-left:2px}
+.newb{display:inline-block;margin-left:6px;font-size:9.5px;font-weight:650;letter-spacing:.3px;color:#0b0e14;background:var(--ok);border-radius:4px;padding:0 5px;vertical-align:1px}
+.src{display:inline-block;margin-left:6px;font-size:9.5px;color:var(--muted);border:1px solid var(--edge);border-radius:4px;padding:0 4px;vertical-align:1px}
+#empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--ink2);padding:18px;line-height:1.6;gap:10px}
+#empty h2{font-size:15px;color:var(--ink);font-weight:650}
+#empty p{max-width:520px;font-size:12.5px}
+#empty code{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px solid var(--edge);border-radius:4px;padding:1px 5px;color:var(--ink)}
+
+/* ---------------- detail drawer ---------------- */
+#detail{width:372px;min-width:372px;height:100%;background:var(--panel);border-left:1px solid var(--edge);display:none;flex-direction:column;z-index:20}
+#detail.open{display:flex}
+#detail .hd{padding:12px 14px 10px;border-bottom:1px solid var(--edge);display:flex;gap:10px;align-items:flex-start}
+#detail .hd h2{font-size:15px;font-weight:650;word-break:break-word}
+#detail .hd .co{font-family:var(--mono);font-size:11px;color:var(--ink2);margin-top:4px;line-height:1.6}
+#detail .hd .x{margin-left:auto;cursor:pointer;color:var(--muted);font-size:15px;padding:0 4px;background:none;border:0}
+#detail .hd .x:hover{color:#fff}
+#detail .bd{flex:1;overflow-y:auto;padding:10px 14px 16px;scrollbar-width:thin;scrollbar-color:var(--edge) transparent}
+#verdict{border-radius:9px;padding:9px 11px;font-size:12.5px;line-height:1.5;margin-bottom:10px;border:1px solid var(--edge);background:var(--panel2);color:var(--ink)}
+#minichart{width:100%;height:230px;border:1px solid var(--edge);border-radius:9px;background:var(--bg);display:block}
+.minibar{display:flex;align-items:center;gap:8px;margin:10px 0 6px}
+.minibar .cap{font-size:11px;color:var(--muted);margin-left:auto}
+.card{border:1px solid var(--edge);border-radius:9px;background:var(--panel2);margin:10px 0;overflow:hidden}
+.card .ch{display:flex;align-items:center;gap:8px;padding:8px 11px;border-bottom:1px solid var(--edge)}
+.card .ch .n{font-weight:600}
+.card .ch .f{margin-left:auto;color:var(--muted);font-size:10.5px}
+.card .cb{padding:8px 11px}
+.card .none{color:var(--muted);font-size:11.5px;line-height:1.5}
+.fld{padding:8px 0;border-top:1px dashed var(--edge)}
+.fld:first-child{border-top:0;padding-top:2px}
+.fld .fh{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.fld .fh .nm{font-family:var(--mono);font-size:12px;color:var(--ink)}
+.beams{display:flex;gap:5px;margin:6px 0 2px;flex-wrap:wrap}
+.beam{border:1px solid var(--edge);border-radius:6px;padding:3px 8px;font-family:var(--mono);font-size:10.5px;color:var(--ink2);background:var(--panel)}
+.beam b{color:var(--ink);font-weight:600}
+.beam.first{border-color:var(--acc)}
+.hist{font-family:var(--mono);font-size:10.5px;color:var(--ink2);line-height:1.7;margin-top:5px}
+.hist .rej{color:#e0847c}
+.steps{display:flex;gap:3px;margin:7px 0 2px}
+.steps span{flex:1;height:4px;border-radius:2px;background:var(--edge)}
+.steplab{display:flex;justify-content:space-between;font-size:9.5px;color:var(--muted);letter-spacing:.2px}
+
+/* modal + drag overlay */
+#modalback{position:fixed;inset:0;background:#0008;display:none;z-index:90;align-items:center;justify-content:center}
+#modal{background:var(--panel);border:1px solid var(--edge);border-radius:12px;width:600px;max-width:92vw;max-height:86vh;overflow-y:auto;box-shadow:0 20px 80px #000c}
+#modal .hd{padding:12px 16px;border-bottom:1px solid var(--edge);font-weight:650;font-size:14px}
+#modal .bd{padding:12px 16px}
+#modal .ft{padding:12px 16px;border-top:1px solid var(--edge);display:flex;justify-content:flex-end;gap:8px}
+#modal .bd h4{margin:12px 0 4px;font-size:12.5px}
+#modal .bd p,#modal .bd li{color:var(--ink2);font-size:12px;line-height:1.6}
+#modal .bd ul{padding-left:18px;margin:4px 0}
+#modal .bd pre{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px solid var(--edge);border-radius:8px;padding:10px;color:var(--ink);overflow:auto;max-height:46vh;line-height:1.55}
+#modal .bd kbd,#modal .bd code{background:var(--panel2);border:1px solid var(--edge);border-radius:4px;padding:0 5px;font-family:var(--mono);font-size:10.5px;color:var(--ink)}
+#dropveil{position:fixed;inset:0;z-index:95;display:none;align-items:center;justify-content:center;background:#0b0e14d9;backdrop-filter:blur(3px)}
+#dropveil div{border:2px dashed var(--acc);border-radius:16px;padding:44px 64px;font-size:18px;font-weight:600;color:var(--ink);text-align:center}
+#dropveil small{display:block;font-size:12px;color:var(--ink2);font-weight:400;margin-top:8px}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#12161ff5;border:1px solid var(--edge);border-radius:8px;
+  padding:8px 14px;font-size:12px;z-index:99;display:none;box-shadow:0 8px 30px #0009}
+a{color:var(--acc2);text-decoration:none}
+a:hover{text-decoration:underline}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--edge);border-radius:5px}
+::-webkit-scrollbar-track{background:transparent}
+@media (max-width:1100px){#detail{position:absolute;right:0;top:0;box-shadow:-20px 0 60px #000a}}
+@media (max-width:760px){#sidebar{position:absolute;left:0;top:0;box-shadow:20px 0 60px #000a;max-width:88vw}#detail{width:100%;min-width:0}#viewinfo .hide-s{display:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div id="brand">
+      <h1>POSSUM <span>Coverage</span> Checker</h1>
+      <div class="sub">Polarisation Sky Survey of the Universe's Magnetism<br>
+      <span id="brandcount">Which targets are covered &mdash; by which band, field, SBID and beam</span></div>
+    </div>
+
+    <div class="section open" id="sec-targets">
+      <div class="sec-head">Targets <span class="chev">&#9654;</span></div>
+      <div class="sec-body">
+        <div id="drop" role="button" tabindex="0" aria-label="Choose a target list file">
+          <b>Drop a target list</b> or click to browse
+          <small>.txt / .csv &middot; one position or object name per line</small>
+        </div>
+        <input type="file" id="file" accept=".txt,.csv,.tsv,.dat,.list,text/plain" style="display:none">
+        <textarea id="text" spellcheck="false" aria-label="Target list" placeholder="13:37:00.92 -29:51:56.7 M83&#10;161.2593 -59.6999 Carina&#10;19:39:25.03 -63:42:45.6&#10;Abell 3627&#10;&hellip;or paste a CSV with ra, dec, name columns"></textarea>
+        <div class="btnrow">
+          <button class="primary" id="run">Check coverage</button>
+          <button id="example">Load example</button>
+          <button id="clear" class="mini" style="margin-left:auto">Clear</button>
+        </div>
+        <div id="parsemsg"></div>
+        <div class="hint">Sexagesimal (RA in hours) or decimal degrees, J2000; name optional, before or after. Lines with only a name are resolved through CDS Sesame (SIMBAD / NED). Headers such as <b>ra, dec, name</b> or <b>l, b</b> are understood.</div>
+      </div>
+    </div>
+
+    <div class="section open" id="sec-survey">
+      <div class="sec-head">Survey status <span class="chev">&#9654;</span></div>
+      <div class="sec-body">
+        <div class="live"><span class="dot busy" id="livedot"></span><div id="livetext">Fetching the survey tracking sheet&hellip;</div></div>
+        <div id="surveystats"></div>
+        <div class="btnrow">
+          <button class="mini" id="refresh">&#8635; Refresh now</button>
+          <a class="mini" id="sheetlink" target="_blank" rel="noopener" style="font-size:11px;align-self:center;margin-left:auto">Open tracking sheet &#8599;</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="section open" id="sec-match">
+      <div class="sec-head">Match settings <span class="chev">&#9654;</span></div>
+      <div class="sec-body">
+        <div class="row"><label style="width:92px">Counts as covered</label>
+          <select id="minstatus" class="grow">
+            <option value="observed">Observed (not rejected)</option>
+            <option value="validated">Validated</option>
+            <option value="processed">POSSUM-processed</option>
+          </select></div>
+        <div class="row" style="margin-bottom:2px"><label class="grow">Max. offset from a beam centre</label><b id="thrval" style="font-family:var(--mono);font-weight:500;font-size:11px"></b></div>
+        <input type="range" id="thr" min="0.3" max="2" step="0.05" aria-label="Maximum offset from a beam centre in degrees">
+        <div class="btnrow" style="margin-top:4px">
+          <button class="mini" data-thr="0.65">0.65&deg; interior</button>
+          <button class="mini" data-thr="1">1.0&deg; default</button>
+          <button class="mini" data-thr="1.6">1.6&deg; legacy script</button>
+        </div>
+        <div class="hint">A target is inside a field when it lies within this distance of one of its 36 beam centres (beam pitch 0.9&deg;). Beyond 0.65&deg; it is outside the beam grid and is flagged <b>edge</b>, where sensitivity falls off.</div>
+      </div>
+    </div>
+
+    <div class="section open" id="sec-map">
+      <div class="sec-head">Map <span class="chev">&#9654;</span></div>
+      <div class="sec-body">
+        <div class="row"><label style="width:62px">Band</label>
+          <div class="seg" id="seg-band"><button data-v="1">Band 1</button><button data-v="2">Band 2</button></div></div>
+        <div class="row"><label style="width:62px">Show</label>
+          <div class="seg" id="seg-mode"><button data-v="fields">Observations</button><button data-v="tiles">Tiles &amp; cubes</button></div></div>
+        <div class="row"><label style="width:62px">Projection</label>
+          <select id="projection" class="grow">
+            <option value="moll">Mollweide (all sky)</option>
+            <option value="globe">Globe (orthographic)</option>
+          </select></div>
+        <div class="row"><label style="width:62px">Frame</label>
+          <select id="frame" class="grow">
+            <option value="eq">Equatorial (RA, Dec)</option>
+            <option value="gal">Galactic (l, b)</option>
+          </select></div>
+        <label class="check"><input type="checkbox" id="lay-grid" checked> Graticule</label>
+        <label class="check"><input type="checkbox" id="lay-plane" checked> Galactic plane / celestial equator</label>
+        <label class="check"><input type="checkbox" id="lay-labels" checked> Target labels</label>
+        <label class="check"><input type="checkbox" id="lay-beams" checked> Beam footprints when zoomed in</label>
+      </div>
+    </div>
+
+    <div class="section open" id="sec-export">
+      <div class="sec-head">Export <span class="chev">&#9654;</span></div>
+      <div class="sec-body">
+        <div class="btnrow">
+          <button id="exp-csv" class="primary">Summary CSV</button>
+          <button id="exp-full">All matches CSV</button>
+          <button id="exp-sbid">SBID / beam list</button>
+          <button id="exp-png">Map PNG</button>
+        </div>
+        <div class="hint"><b>Summary</b>: one row per target. <b>All matches</b>: one row per target &times; covering field &times; nearest beams. <b>SBID / beam list</b>: the unique scheduling blocks and beams to fetch from CASDA.</div>
+      </div>
+    </div>
+
+    <div class="section" id="sec-about">
+      <div class="sec-head">About <span class="chev">&#9654;</span></div>
+      <div class="sec-body" id="aboutbody"></div>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="stage">
+      <canvas id="sky" aria-label="Sky map of POSSUM survey coverage and your targets"></canvas>
+      <div id="topbar">
+        <button id="burger" title="Toggle panel" aria-label="Toggle panel">&#9776;</button>
+        <div id="quick"><span class="ic">&#128269;</span>
+          <input type="search" id="quickbox" placeholder="Check an object name or position &hellip;" autocomplete="off" aria-label="Quick check">
+        </div>
+        <div id="viewinfo">
+          <button class="pill" id="pill-live" title="Survey status source"><span class="dot busy"></span><span>Loading status&hellip;</span></button>
+          <div class="pill hide-s" id="pill-view">&nbsp;</div>
+          <button class="pill" id="helpbtn" title="Help">?</button>
+        </div>
+      </div>
+      <div id="banner"></div>
+      <div id="legend"></div>
+      <div id="mapctl"><button id="zin" title="Zoom in" aria-label="Zoom in">+</button><button id="zout" title="Zoom out" aria-label="Zoom out">&minus;</button><button id="zhome" title="Reset view" aria-label="Reset view">&#8962;</button></div>
+      <div id="status"><span id="st-coord">&nbsp;</span><span id="st-obj">&nbsp;</span>
+        <span style="margin-left:auto" id="st-help">drag to move &middot; wheel to zoom &middot; click a target or field</span></div>
+      <div id="progress"><span id="progresstext">Working&hellip;</span><div class="bar"><div id="progressbar"></div></div></div>
+      <div id="inspect"></div>
+      <div id="tip"></div>
+    </div>
+    <div id="split" title="Drag to resize"></div>
+    <div id="results">
+      <div id="resbar">
+        <span class="ttl">Results</span>
+        <span id="reschips"></span>
+        <input type="search" id="resfilter" placeholder="Filter by name, field, SBID &hellip;" aria-label="Filter results">
+      </div>
+      <div id="tablewrap"></div>
+    </div>
+  </div>
+
+  <div id="detail" aria-live="polite"></div>
+</div>
+<div id="modalback"><div id="modal" role="dialog" aria-modal="true"></div></div>
+<div id="dropveil"><div>Drop to check coverage<small>target list as plain text or CSV</small></div></div>
+<div id="toast" role="status"></div>
+<script>/*@DATA@*/</script>
+<script>/*@LIB@*/</script>
+<script>/*@UI@*/</script>
+</body>
+</html>
