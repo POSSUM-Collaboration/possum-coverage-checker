@@ -29,7 +29,7 @@ const ST = {
   S: null, M: null, src: { kind: "loading" }, targets: [], results: [], sel: -1, filter: "all", q: "", sort: { k: "i", d: 1 },
   cfg: Object.assign({ thr: 1.0, minStatus: "observed" }, store.get("cfg", {})),
   view: { proj: "moll", frame: "eq", lon0: 0, lat0: 0, zoom: 1, panX: 0, panY: 0 },
-  map: Object.assign({ band: 1, mode: "fields", grid: true, plane: true, labels: true, beams: true, proj: "moll", frame: "eq" }, store.get("map", {})),
+  map: Object.assign({ band: 1, mode: "fields", grid: true, plane: true, labels: true, beams: true, euclidWide: false, euclidDeep: false, proj: "moll", frame: "eq" }, store.get("map", {})),
   miniBand: 1, tpos: [], runId: 0, issues: [], resolved: {},
 };
 ST.view.proj = ST.map.proj; ST.view.frame = ST.map.frame;
@@ -311,6 +311,7 @@ function drawSky(canvas, view, o) {
     }
     if (P.ppd >= 17 && !o.mini) { ctx.font = "10.5px -apple-system,Segoe UI,sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = "#9aa3b5cc"; for (const k of order) for (const f of groups[k] || []) { if (f.half === "B") continue; const tp = rd2v(f.ra, Math.min(89.9, f.dec + f.rmax + 0.75)); const p = P.fwd(P.ppd >= 20 ? tp : f.c); if (p[2] > 0 && p[0] > -40 && p[0] < w + 40 && p[1] > 0 && p[1] < h) { ctx.strokeStyle = "#0b0e14e0"; ctx.lineWidth = 3; ctx.lineJoin = "round"; ctx.strokeText(f.pairName || f.full, p[0], p[1] + 3); ctx.fillText(f.pairName || f.full, p[0], p[1] + 3); } } }
   }
+  if (!o.mini) drawEuclid(ctx, canvas, P, view, w, h, o.scale || 1, ST.map.euclidWide, ST.map.euclidDeep);
   ctx.restore();
   P.outline(ctx); ctx.strokeStyle = "#2c3446"; ctx.lineWidth = 1; ctx.stroke();
 
@@ -378,6 +379,8 @@ function renderLegend() {
     h = `<div class="t">${BANDS[b].label} tiles · 3D pipeline</div>` + ["done", "waiting", "running", "failed", "ingest", "none"].map(k => `<div class="li"><span class="sw" style="background:${TSTAT[k].col}${k === "none" ? "40" : ""}"></span>${TSTAT[k].label}<b>${cnt[k]}</b></div>`).join("");
   } else h = `<div class="t">${BANDS[b].label} fields · ${BANDS[b].freq}</div>` + ["processed", "validated", "observed", "rejected", "planned"].map(k => `<div class="li"><span class="sw" style="background:${FSTAT[k].col}${k === "planned" ? "55" : ""}"></span>${FSTAT[k].label}<b>${x[k]}</b></div>`).join("");
   if (ST.map.mode !== "tiles" && ST.S[b].some(f => f.pair)) h += `<div class="li" style="margin-top:4px;padding-top:4px;border-top:1px solid var(--edge)"><span class="ab" style="margin:0"><i style="background:#9aa3b5">A</i><i style="background:#566076">B</i></span>split field: east half A, west half B</div>`;
+  for (const kind of ["wide", "deep"]) if (ST.map[kind === "wide" ? "euclidWide" : "euclidDeep"])
+    h += `<div class="li"><span class="sw" style="background:rgb(${EUCLID_COLOURS[kind].join(",")})"></span>Euclid DR1 ${kind} tiles</div>`;
   $("legend").innerHTML = h;
 }
 function homeView() { ST.view.proj = ST.map.proj; syncControls(); Object.assign(ST.view, { lon0: ST.view.proj === "globe" ? 60 : 0, lat0: ST.view.proj === "globe" ? -45 : 0, zoom: 1, panX: 0, panY: 0 }); draw(); }
@@ -667,7 +670,7 @@ function syncControls() {
   document.querySelectorAll("#seg-band button").forEach(b => b.classList.toggle("on", +b.dataset.v === ST.map.band));
   document.querySelectorAll("#seg-mode button").forEach(b => b.classList.toggle("on", b.dataset.v === ST.map.mode));
   $("projection").value = ST.view.proj; document.querySelectorAll("#seg-proj button").forEach(b => b.classList.toggle("on", b.dataset.v === ST.view.proj)); $("frame").value = ST.view.frame; $("minstatus").value = ST.cfg.minStatus; $("thr").value = ST.cfg.thr; $("thrval").textContent = (+ST.cfg.thr).toFixed(2) + "°";
-  for (const k of ["grid", "plane", "labels", "beams"]) $("lay-" + k).checked = ST.map[k];
+  for (const k of ["grid", "plane", "labels", "beams", "euclidWide", "euclidDeep"]) $("lay-" + k).checked = ST.map[k];
   document.querySelectorAll("[data-thr]").forEach(b => b.classList.toggle("on", Math.abs(+b.dataset.thr - ST.cfg.thr) < 1e-6));
 }
 /* All-sky Mollweide <-> draggable globe. Going to the globe keeps whatever is at the centre of the view. */
@@ -703,7 +706,7 @@ function wire() {
   $("projection").onchange = e => setProj(e.target.value);
   document.querySelectorAll("#seg-proj button").forEach(b => b.onclick = () => setProj(b.dataset.v));
   $("frame").onchange = e => { ST.view.frame = ST.map.frame = e.target.value; store.set("map", ST.map); homeView(); };
-  for (const k of ["grid", "plane", "labels", "beams"]) $("lay-" + k).onchange = e => { ST.map[k] = e.target.checked; saveMap(); draw(); };
+  for (const k of ["grid", "plane", "labels", "beams", "euclidWide", "euclidDeep"]) $("lay-" + k).onchange = e => { ST.map[k] = e.target.checked; saveMap(); renderLegend(); draw(); };
   $("zin").onclick = () => zoomBy(1.6); $("zout").onclick = () => zoomBy(1 / 1.6); $("zhome").onclick = homeView;
   $("exp-csv").onclick = exportSummary; $("exp-full").onclick = exportFull; $("exp-sbid").onclick = exportSbids; $("exp-png").onclick = exportPNG;
   $("reschips").onclick = e => { const b = e.target.closest("[data-f]"); if (b) { ST.filter = b.dataset.f; renderResults(); } };

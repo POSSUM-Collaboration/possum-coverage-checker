@@ -94,3 +94,9 @@ Use the chips above the table to show only targets covered in Band 1, Band 2, bo
 | Map PNG | The current map view at 2× resolution with title, status source and key. |
 
 Every CSV starts with a `#` comment line recording the status source and time, the maximum offset and the coverage level (read with `pandas.read_csv(..., comment="#")`).
+
+## Euclid DR1-Foundation overlay
+
+Under map layers, select **Wide tile footprint (gold)**, **Deep tile footprint (violet)**, or both. The legend identifies selected layers; violet takes precedence where they overlap. Selections persist across visits and work offline, in both map projections and coordinate frames, with either POSSUM band/status view. PNG exports include the selected footprints.
+
+These are the released image tile coverage MOCs used by NASA/IPAC IRSA's Euclid Data Explorer, not the planned Euclid survey. Tile margins can include unobserved or masked pixels, and depth varies. Zoom in to inspect edges; the overlay does not alter POSSUM coverage results. See [data provenance](../data/euclid/README.md) for source files, scope and credit.

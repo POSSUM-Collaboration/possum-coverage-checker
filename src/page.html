@@ -332,6 +332,10 @@ a:hover{text-decoration:underline}
         <label class="check"><input type="checkbox" id="lay-plane" checked> Galactic plane / celestial equator</label>
         <label class="check"><input type="checkbox" id="lay-labels" checked> Target labels</label>
         <label class="check"><input type="checkbox" id="lay-beams" checked> Beam footprints when zoomed in</label>
+        <div class="hint"><b>Euclid DR1-Foundation</b></div>
+        <label class="check"><input type="checkbox" id="lay-euclidWide"> Wide tile footprint (gold)</label>
+        <label class="check"><input type="checkbox" id="lay-euclidDeep"> Deep tile footprint (violet)</label>
+        <p class="hint">Released tile coverage from NASA/IPAC IRSA. Tile edges include margins; this is not a uniform-depth or science-quality mask. <a href="https://irsa.ipac.caltech.edu/onlinehelp/euclid/euclid/searching.html" target="_blank" rel="noopener">Footprint details</a></p>
       </div>
     </div>
 
@@ -396,6 +400,8 @@ a:hover{text-decoration:underline}
 <div id="toast" role="status"></div>
 <script>/*@DATA@*/</script>
 <script>/*@LIB@*/</script>
+<script>/*@EUCLID_DATA@*/</script>
+<script>/*@EUCLID@*/</script>
 <script>/*@UI@*/</script>
 </body>
 </html>

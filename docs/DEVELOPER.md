@@ -48,3 +48,11 @@ Field status is derived in `applyStatus`: no SBID → planned; `validated` start
 ## Hosting note
 
 The page must be able to fetch `docs.google.com` and `cds.unistra.fr` from the browser. GitHub Pages and a local `file://` copy both allow this; sandboxed hosts that block cross-origin requests will only ever show the snapshot.
+
+## Euclid overlay
+
+`src/euclid-data.js` embeds lossless order-13 NESTED ranges from the two pinned IRSA tile MOCs in `data/euclid/`. `tools/build_euclid.py` (Astropy required) regenerates this file. Normal builds need only Python's standard library. `src/euclid.js` supplies NESTED indexing, range membership and cached inverse-projection raster rendering. It is separate from POSSUM's RING tile geometry.
+
+Each CSS display pixel (each output pixel for PNG exports) is inverse-projected with the existing projector into an equatorial unit vector and tested against the original MOC. Thus Galactic rotation, Mollweide wrapping, orthographic limb clipping, pan and zoom use the same geometry as the checker. Deep takes colour precedence where selected layers overlap. The translucent raster is drawn above fields/tiles and below targets, and is included by the shared PNG renderer. Detail beam charts stay focused on POSSUM. A per-canvas cache is invalidated by changes to view, dimensions or selection. Like any raster, subpixel features may disappear at all-sky scale; zoom in for finer boundaries. No MOC resolution is discarded in the bundled data.
+
+Additional checks: `node tests/euclid.mjs` and `node tests/euclid-browser.mjs` (Playwright). The reference fixture contains 1,500 deterministic random sky coordinates and order-13 pixel indices from Astropy HEALPix, independent of the JS implementation. Exact HEALPix edge/corner coordinates can have library-dependent tie-breaking and are excluded from that cross-library comparison. Browser checks cover both frames/projections, clipping, persistent selections, offline data and PNG export.

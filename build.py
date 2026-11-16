@@ -4,7 +4,7 @@ import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parent
 page = (ROOT / "src" / "page.html").read_text(encoding="utf-8")
-for marker, name in (("/*@DATA@*/", "data.js"), ("/*@LIB@*/", "lib.js"), ("/*@UI@*/", "ui.js")):
+for marker, name in (("/*@DATA@*/", "data.js"), ("/*@LIB@*/", "lib.js"), ("/*@EUCLID_DATA@*/", "euclid-data.js"), ("/*@EUCLID@*/", "euclid.js"), ("/*@UI@*/", "ui.js")):
     code = (ROOT / "src" / name).read_text(encoding="utf-8").replace("</script", "<\\/script")
     assert marker in page, marker
     page = page.replace(marker, code)
